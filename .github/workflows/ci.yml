@@ -53,7 +53,7 @@ jobs:
 
       # Build Docker image
       - name: Build Docker image
-        run: docker build -t $DOCKER_IMAGE_NAME .
+        run: docker build -t democyber:latest -t $DOCKER_IMAGE_NAME .
 
       # Test Docker image locally
       - name: Test Docker image locally
@@ -63,3 +63,24 @@ jobs:
           curl -f http://localhost:8080 || echo "App not responding"
           docker stop democyber-test
           docker rm democyber-test
+
+      # Scan Docker image with Trivy (and generate json/sarif report)
+      - name: Scan Docker image with Trivy
+        uses: aquasecurity/trivy-action@0.20.0
+        with:
+          image-ref: democyber:latest
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          exit-code: '1'
+          severity: 'CRITICAL,HIGH'
+
+      # Upload Trivy report
+      - name: Upload Trivy report
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-report
+          path: trivy-results.sarif
+
+      # Push Docker image sur Docker Hub
+      - name: Push Docker image
+        run: docker push $DOCKER_IMAGE_NAME
