@@ -13,9 +13,11 @@ jobs:
     env:
       DOCKER_IMAGE_NAME: ${{ secrets.DOCKERHUB_USERNAME }}/democyber1:latest
     steps:
-      # 1. Récupération du code source
+      # 1. Récupération du code source (historique complet pour Sonar)
       - name: Checkout repository
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
 
       # 2. Scan de sécurité Gitleaks (détection des secrets)
       - name: Run Gitleaks scan
@@ -28,6 +30,7 @@ jobs:
         with:
           name: gitleaks-report
           path: results.sarif
+          if-no-files-found: ignore
 
       # 4. Configuration de Java 21
       - name: Set up JDK 21
@@ -44,15 +47,16 @@ jobs:
       - name: Build Java project with Maven
         run: mvn clean package
 
-      # 6b. Run SonarCloud scan
+      # 6b. Analyse de qualité et sécurité du code avec SonarCloud
       - name: SonarCloud Scan
-        uses: SonarSource/sonarcloud-github-action@master
+        uses: SonarSource/sonarqube-scan-action@v5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         with:
-          projectBaseDir: .
           args: >
             -Dsonar.organization=${{ secrets.SONAR_ORGANIZATION }}
             -Dsonar.projectKey=${{ secrets.SONAR_PROJECT_KEY }}
-            -Dsonar.login=${{ secrets.SONAR_TOKEN }}
+            -Dsonar.java.binaries=target/classes
 
       # 7. Connexion à Docker Hub
       - name: Login to Docker Hub
@@ -76,7 +80,7 @@ jobs:
 
       # 10. Scan de vulnérabilités Trivy (Génération du rapport SARIF)
       - name: Scan Docker image with Trivy
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@0.28.0
         with:
           image-ref: democyber:latest
           format: 'sarif'
